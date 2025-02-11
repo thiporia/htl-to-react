@@ -1,0 +1,36 @@
+{
+  "name": "htl-to-react",
+  "version": "0.0.1",
+  "description": "htl to react",
+  "main": "index.js",
+  "scripts": {
+    "test": "jest",
+    "start": "index.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/thiporia/htl-to-react.git"
+  },
+  "keywords": [
+    "htl",
+    "aem",
+    "react"
+  ],
+  "author": "thiporia",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/thiporia/htl-to-react/issues"
+  },
+  "homepage": "https://github.com/thiporia/htl-to-react#readme",
+  "type": "module",
+  "devDependencies": {
+    "@babel/core": "^7.26.8",
+    "@babel/preset-env": "^7.26.8",
+    "antlr4": "^4.13.2",
+    "babel-jest": "^29.7.0",
+    "jest": "^29.7.0"
+  },
+  "dependencies": {
+    "cheerio": "^1.0.0"
+  }
+}
