@@ -1,28 +1,28 @@
-import antlr4 from "antlr4";
-
 export const TOKEN_TYPES = {
-  EXPR_START: "EXPR_START", // "${"
-  EXPR_END: "EXPR_END", // "}"
-  BOOL_CONSTANT: "BOOL_CONSTANT", // "true", "false"
-  FLOAT: "FLOAT", // 부동소수점 숫자
-  INT: "INT", // 정수
-  STRING: "STRING", // 따옴표로 묶인 문자열
-  ID: "ID", // 식별자 (알파벳, _로 시작)
-  DOT: "DOT", // "."
-  LBRACKET: "LBRACKET", // "["
-  RBRACKET: "RBRACKET", // "]"
-  LPAR: "LPAR", // "("
-  RPAR: "RPAR", // ")"
-  COMMA: "COMMA", // ","
-  COLON: "COLON", // ":"
-  QUESTION: "QUESTION", // "?"
-  NOT: "NOT", // "!"
-  AND_OP: "AND_OP", // "&&"
-  OR_OP: "OR_OP", // "||"
-  ASSIGN: "ASSIGN", // "="
-  WS: "WS", // 공백 (스킵)
-  UNKNOWN: "UNKNOWN", // 알 수 없는 토큰
+  EXPR_START: "EXPR_START",
+  EXPR_END: "EXPR_END",
+  BOOL_CONSTANT: "BOOL_CONSTANT",
+  FLOAT: "FLOAT",
+  INT: "INT",
+  STRING: "STRING",
+  ID: "ID",
+  DOT: "DOT",
+  LBRACKET: "LBRACKET",
+  RBRACKET: "RBRACKET",
+  LPAR: "LPAR",
+  RPAR: "RPAR",
+  COMMA: "COMMA",
+  COLON: "COLON",
+  QUESTION: "QUESTION",
+  NOT: "NOT",
+  AND_OP: "AND_OP",
+  OR_OP: "OR_OP",
+  ASSIGN: "ASSIGN",
+  WS: "WS",
+  UNKNOWN: "UNKNOWN",
   EOF: "EOF",
+  EQ: "EQ", // "=="
+  NEQ: "NEQ", // "!="
 };
 
 const tokenSpecs = [
@@ -37,6 +37,11 @@ const tokenSpecs = [
     regex: /^"([^"\\]*(\\.[^"\\]*)*)"|^'([^'\\]*(\\.[^'\\]*)*)'/,
   },
   { type: TOKEN_TYPES.ID, regex: /^[a-zA-Z_][a-zA-Z0-9_]*/ },
+
+  // 다중 문자 연산자를 단일 문자 연산자보다 먼저 매칭하도록 한다.
+  { type: TOKEN_TYPES.EQ, regex: /^==/ },
+  { type: TOKEN_TYPES.NEQ, regex: /^!=/ },
+
   { type: TOKEN_TYPES.DOT, regex: /^\./ },
   { type: TOKEN_TYPES.LBRACKET, regex: /^\[/ },
   { type: TOKEN_TYPES.RBRACKET, regex: /^\]/ },
@@ -51,12 +56,7 @@ const tokenSpecs = [
   { type: TOKEN_TYPES.ASSIGN, regex: /^=/ },
 ];
 
-/**
- * createLexer 함수는 입력(문자열 또는 antlr4.InputStream 객체)을 받아
- * 내부 토큰 배열을 생성한 후, nextToken, peekToken 등의 함수형 인터페이스를 반환합니다.
- */
 export function createLexer(input) {
-  // input이 문자열이면 그대로 사용, 그렇지 않으면 input.strdata 속성을 사용
   const inputStr = typeof input === "string" ? input : input.strdata || "";
   let pos = 0;
   const tokens = [];
@@ -74,13 +74,11 @@ export function createLexer(input) {
       }
       if (match) {
         const tokenValue = match[0];
-        // WS 토큰은 건너뜁니다.
         if (matchedType !== TOKEN_TYPES.WS) {
           tokens.push({ type: matchedType, value: tokenValue, index: pos });
         }
         pos += tokenValue.length;
       } else {
-        // 매칭되지 않는 경우 UNKNOWN 토큰 생성
         tokens.push({
           type: TOKEN_TYPES.UNKNOWN,
           value: inputStr[pos],
@@ -89,20 +87,26 @@ export function createLexer(input) {
         pos++;
       }
     }
-    // 입력의 끝에 EOF 토큰 추가
     tokens.push({ type: TOKEN_TYPES.EOF, value: "<EOF>", index: pos });
   }
 
   tokenize();
-  // 함수형 객체 생성
-  const lexerObj = {
-    nextToken: () => tokens.shift(),
-    peekToken: () => tokens[0],
-    getAllTokens: () => tokens.slice(),
-  };
 
-  // antlr4.Lexer의 프로토타입을 상속하도록 설정
-  Object.setPrototypeOf(lexerObj, antlr4.Lexer.prototype);
+  let index = 0;
+  const lexerObj = {
+    nextToken: () => {
+      if (index < tokens.length) {
+        return tokens[index++];
+      } else {
+        return { type: TOKEN_TYPES.EOF, value: "<EOF>", index: pos };
+      }
+    },
+    peekToken: () => tokens[index],
+    getAllTokens: () => tokens.slice(),
+    reset: () => {
+      index = 0;
+    },
+  };
 
   return lexerObj;
 }

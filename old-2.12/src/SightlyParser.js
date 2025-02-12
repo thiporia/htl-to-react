@@ -1,31 +1,35 @@
 // SightlyParser.js
 import { TOKEN_TYPES } from "./SightlyLexer.js";
 
-/**
- * createParser 함수는 lexer (함수형 객체)를 받아 재귀 하강 파서를 클로저로 생성합니다.
- * 반환되는 객체는 expression() 함수를 포함하며, 이는 최상위 파싱 규칙(예: '${' exprNode '}' )을 실행합니다.
- */
 export function createParser(lexer) {
-  console.log("gave lexer", lexer);
-  // 현재 토큰: lexer.nextToken()으로 얻은 토큰
   let currentToken = lexer.nextToken();
 
-  // eat 함수: 현재 토큰이 기대한 타입이면 소비(consumes)하고, 아니라면 에러 발생
-  function eat(type) {
-    if (currentToken && currentToken.type === type) {
+  function eat(expectedType) {
+    if (!currentToken) {
+      throw new Error(
+        `Unexpected token: expected ${expectedType}, but reached end-of-input.`
+      );
+    }
+    if (currentToken.type === TOKEN_TYPES.EOF) {
+      if (expectedType === TOKEN_TYPES.EOF) {
+        return currentToken;
+      } else {
+        throw new Error(
+          `Unexpected token: expected ${expectedType}, got EOF at position ${currentToken.index}`
+        );
+      }
+    }
+    if (currentToken.type === expectedType) {
       const token = currentToken;
       currentToken = lexer.nextToken();
       return token;
     } else {
       throw new Error(
-        `Unexpected token: expected ${type}, got ${
-          currentToken ? currentToken.type : "null"
-        } at position ${currentToken ? currentToken.index : "EOF"}`
+        `Unexpected token: expected ${expectedType}, got ${currentToken.type} at position ${currentToken.index}`
       );
     }
   }
 
-  // 최상위 규칙: expression = '${' exprNode '}'
   function expression() {
     eat(TOKEN_TYPES.EXPR_START);
     const node = exprNode();
@@ -33,12 +37,24 @@ export function createParser(lexer) {
     return { type: "expression", children: [node] };
   }
 
-  // exprNode = orExpression (삼항 연산자 등은 미구현)
   function exprNode() {
-    return orExpression();
+    let node = orExpression();
+    // 삼항 연산자 처리: 만약 현재 토큰이 QUESTION이면,
+    if (currentToken && currentToken.type === TOKEN_TYPES.QUESTION) {
+      eat(TOKEN_TYPES.QUESTION);
+      const thenExpr = orExpression();
+      eat(TOKEN_TYPES.COLON);
+      const elseExpr = orExpression();
+      node = {
+        type: "ternary",
+        condition: node,
+        then: thenExpr,
+        else: elseExpr,
+      };
+    }
+    return node;
   }
 
-  // orExpression = andExpression ( '||' andExpression )*
   function orExpression() {
     let node = andExpression();
     while (currentToken && currentToken.type === TOKEN_TYPES.OR_OP) {
@@ -49,7 +65,6 @@ export function createParser(lexer) {
     return node;
   }
 
-  // andExpression = equalityExpression ( '&&' equalityExpression )*
   function andExpression() {
     let node = equalityExpression();
     while (currentToken && currentToken.type === TOKEN_TYPES.AND_OP) {
@@ -60,12 +75,11 @@ export function createParser(lexer) {
     return node;
   }
 
-  // equalityExpression = relationalExpression ( ('==' | '!=') relationalExpression )*
   function equalityExpression() {
     let node = relationalExpression();
     while (
       currentToken &&
-      (currentToken.value === "==" || currentToken.value === "!=")
+      (currentToken.type === "EQ" || currentToken.type === "NEQ")
     ) {
       const opToken = currentToken;
       eat(currentToken.type);
@@ -79,7 +93,6 @@ export function createParser(lexer) {
     return node;
   }
 
-  // relationalExpression = additiveExpression ( ('<' | '<=' | '>' | '>=') additiveExpression )*
   function relationalExpression() {
     let node = additiveExpression();
     while (
@@ -101,7 +114,6 @@ export function createParser(lexer) {
     return node;
   }
 
-  // additiveExpression = multiplicativeExpression ( ('+' | '-') multiplicativeExpression )*
   function additiveExpression() {
     let node = multiplicativeExpression();
     while (
@@ -120,7 +132,6 @@ export function createParser(lexer) {
     return node;
   }
 
-  // multiplicativeExpression = unaryExpression ( ('*' | '/') unaryExpression )*
   function multiplicativeExpression() {
     let node = unaryExpression();
     while (
@@ -139,7 +150,6 @@ export function createParser(lexer) {
     return node;
   }
 
-  // unaryExpression = ( '!' )? primary
   function unaryExpression() {
     if (currentToken && currentToken.type === TOKEN_TYPES.NOT) {
       const opToken = eat(TOKEN_TYPES.NOT);
@@ -149,7 +159,6 @@ export function createParser(lexer) {
     return primary();
   }
 
-  // primary = literal | identifier ( ('.' identifier)* ) | '(' exprNode ')' | arrayLiteral
   function primary() {
     const token = currentToken;
     if (!token) {
@@ -172,7 +181,6 @@ export function createParser(lexer) {
       eat(TOKEN_TYPES.BOOL_CONSTANT);
       return { type: "bool", value: token.value };
     } else if (token.type === TOKEN_TYPES.ID) {
-      // 식별자 및 프로퍼티 접근
       let node = { type: "identifier", value: token.value };
       eat(TOKEN_TYPES.ID);
       while (currentToken && currentToken.type === TOKEN_TYPES.DOT) {
@@ -187,7 +195,6 @@ export function createParser(lexer) {
       eat(TOKEN_TYPES.RPAR);
       return node;
     } else if (token.type === TOKEN_TYPES.LBRACKET) {
-      // 배열 리터럴
       eat(TOKEN_TYPES.LBRACKET);
       const elements = [];
       if (currentToken && currentToken.type !== TOKEN_TYPES.RBRACKET) {
