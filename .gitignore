@@ -1,4 +1,4 @@
 build/
 node_modules
 input.html
-output.ts
+output.tsx
