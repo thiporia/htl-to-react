@@ -39,6 +39,8 @@
 5. **const { /_ add your props here _/ } = props;** 에 props 를 채워넣음
 6. 일부 타입스크립트 에러 제거 후 활용
 
+**format**과 **manipulateUri** 등은 client 에서 상황에 맞게 직접 구현해야함
+
 ## 개선방안
 
 #### 속성 추가가 필요하면?(HTLConverter.js)

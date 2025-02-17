@@ -1,4 +1,43 @@
 const { parseDocument } = require("htmlparser2");
+const { processFormatOption } = require("../utils/format");
+
+/**
+ * 주어진 문자열에서 동적 표현식(${...})을 추출하는 함수 (밸런스 고려)
+ * 반환값: { expression: 추출된 표현식 (중괄호 포함), rest: 나머지 문자열 }
+ * 동적 표현식이 없으면 null 반환
+ */
+function extractDynamicExpressionBalanced(str) {
+  const start = str.indexOf("${");
+  if (start === -1) return null;
+  let index = start + 2;
+  let braceCount = 1;
+  while (index < str.length && braceCount > 0) {
+    if (str[index] === "{") {
+      braceCount++;
+    } else if (str[index] === "}") {
+      braceCount--;
+    }
+    index++;
+  }
+  if (braceCount !== 0) {
+    throw new Error("Unbalanced braces in dynamic expression");
+  }
+  const expression = str.substring(start, index); // includes ${ ... }
+  const rest = str.substring(index);
+  return { expression, rest };
+}
+
+/**
+ * 기존 extractDynamicExpression 대신, 동적 표현식의 내부 내용을 균형 있게 추출하는 함수
+ */
+function extractDynamicExpressionContent(str) {
+  // 가정: str은 "${...}" 형태임
+  if (!str.startsWith("${") || !str.endsWith("}")) {
+    throw new Error("Invalid dynamic expression format");
+  }
+  // ${ 와 } 제거
+  return str.substring(2, str.length - 1).trim();
+}
 
 /**
  * 원본 노드를 문자열로 생성하는 헬퍼 함수.
@@ -50,6 +89,72 @@ function extractDynamicExpression(str) {
  *   - "nuggetItems.nuggetEyebrow @ context='html'" → "parse(nuggetItems.nuggetEyebrow)"
  */
 function processDynamicExpression(expr) {
+  // format 옵션이 포함된 경우 처리
+  if (expr.includes("@ format=")) {
+    return processFormatOption(expr);
+  }
+
+  // (필요에 따라 join 옵션, equality operator 처리 등 다른 전처리 코드 포함)
+  expr = expr.replace(
+    /(\[[^\]]+\])\s*@\s*join\s*=\s*(['"])(.*?)\2/g,
+    (match, arrLiteral, quote, joinStr) => {
+      return `${arrLiteral}.join(${quote}${joinStr}${quote})`;
+    }
+  );
+
+  const optionIndex = expr.indexOf("@");
+  if (optionIndex !== -1) {
+    let baseExpr = expr.substring(0, optionIndex).trim();
+    const optionsStr = expr.substring(optionIndex + 1).trim();
+    const uriOptionKeys = [
+      "scheme",
+      "domain",
+      "path",
+      "prependPath",
+      "appendPath",
+      "selectors",
+      "addSelectors",
+      "removeSelectors",
+      "extension",
+      "suffix",
+      "prependSuffix",
+      "appendSuffix",
+      "query",
+      "addQuery",
+      "removeQuery",
+      "fragment",
+    ];
+    const optionParts = optionsStr.split(",").map((part) => part.trim());
+    const optionsObj = {};
+    optionParts.forEach((part) => {
+      const eqIndex = part.indexOf("=");
+      if (eqIndex !== -1) {
+        let key = part.substring(0, eqIndex).trim();
+        let value = part.substring(eqIndex + 1).trim();
+        value = value.replace(/^['"]|['"]$/g, "");
+        optionsObj[key] = value;
+      } else {
+        optionsObj[part] = true;
+      }
+    });
+    const hasUriOption = Object.keys(optionsObj).some((key) =>
+      uriOptionKeys.includes(key)
+    );
+    if (hasUriOption) {
+      const literalMatch = baseExpr.match(/^(['"])(.*)\1$/);
+      if (!literalMatch) {
+        throw new Error(
+          `HTL 변환 오류: URI Manipulation의 기본 표현식은 반드시 문자열 리터럴이어야 합니다. (expr: ${baseExpr})`
+        );
+      }
+      const literalValue = literalMatch[2];
+      // const manipulatedUri = manipulateUri(literalValue, optionsObj);
+      // 최종 결과를 문자열 리터럴로 반환 이건 client 에서 구현되어 있어야 함
+      return `manipulateUri(literalValue, optionsObj)`;
+    }
+  }
+
+  // 4. context, html, i18n 옵션 처리 (필요 시 기존 로직 적용)
   const scriptStringMatch = expr.match(
     /^(.*?)\s*@\s*context=['"]scriptString['"]\s*$/
   );
@@ -66,6 +171,7 @@ function processDynamicExpression(expr) {
     const inner = i18nMatch[1].trim();
     return `t(${inner})`;
   }
+
   return expr;
 }
 
@@ -73,17 +179,35 @@ function processDynamicExpression(expr) {
  * 텍스트 노드 내의 동적 표현식(${ ... })을 처리하여 JSX 문자열로 변환하는 함수
  */
 function processTextValue(value) {
-  const parts = value.split(/(\${[^}]+})/);
-  return parts
-    .map((part) => {
-      if (part.startsWith("${") && part.endsWith("}")) {
-        let expr = extractDynamicExpression(part);
-        expr = processDynamicExpression(expr);
-        return `{${expr}}`;
-      }
-      return part;
-    })
-    .join("");
+  // const parts = value.split(/(\${[^}]+})/);
+  // return parts
+  //   .map((part) => {
+  //     if (part.startsWith("${") && part.endsWith("}")) {
+  //       let expr = extractDynamicExpression(part);
+  //       expr = processDynamicExpression(expr);
+  //       return `{${expr}}`;
+  //     }
+  //     return part;
+  //   })
+  //   .join("");
+  let result = "";
+  let remaining = value;
+  while (true) {
+    const extracted = extractDynamicExpressionBalanced(remaining);
+    if (!extracted) {
+      result += remaining;
+      break;
+    }
+    // 앞부분 정적 텍스트
+    result += remaining.substring(0, remaining.indexOf("${"));
+    // 동적 표현식
+    const dynExpr = extracted.expression; // e.g. "${ 'Asset {0} out of {1}' @ format=... }"
+    const content = extractDynamicExpressionContent(dynExpr);
+    const processed = processDynamicExpression(content);
+    result += `{${processed}}`;
+    remaining = extracted.rest;
+  }
+  return result;
 }
 
 /**
