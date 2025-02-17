@@ -35,7 +35,23 @@
 1. https://thiporia.github.io/htl-to-react/ 경로 진입
 2. Input 에 변경을 원하는 HTL 태그 입력
 3. 변환 결과 확인
-4. **Copy** 버튼을 통해 복사 후 사용
+4. **Copy** 버튼을 통해 복사 후 {component}.tsx 파일에 저장
+5. **const { /_ add your props here _/ } = props;** 에 props 를 채워넣음
+6. 일부 타입스크립트 에러 제거 후 활용
+
+## 개선방안
+
+#### 속성 추가가 필요하면?(HTLConverter.js)
+
+- transformAttrName 에 조건 추가
+
+#### Optional 정의가 추가로 필요하면?
+
+- processDynamicExpression 에 조건 추가
+
+#### Node 자체에 무언가 설정을 변경해야하면?
+
+- parseNode 에 조건 추가
 
 ## issue
 

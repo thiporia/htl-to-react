@@ -206,7 +206,24 @@ function convertHTLToReact(htlInput) {
                 expr = `"${expr}"`;
               }
               vars[varName] = expr;
+            } else if (attr.startsWith("data-sly-test.")) {
+              // 신규 기능: data-sly-test.[변수명] 형식이면 data-sly-set과 같이 변수 선언 처리
+              const varName = attr.split(".")[1];
+              let expr = val;
+              if (expr.startsWith("${") && expr.endsWith("}")) {
+                expr = extractDynamicExpression(expr);
+                // 기존 data-sly-test의 경우 단순 비교 조건으로 사용되므로
+                // '==' 연산자를 '==='로 변환하여 엄격한 비교를 수행하도록 합니다.
+                expr = expr.replace(/==/g, "===");
+                expr = processDynamicExpression(expr);
+              } else if (expr.includes("${")) {
+                expr = "`" + expr + "`";
+              } else {
+                expr = `"${expr}"`;
+              }
+              vars[varName] = expr;
             } else if (attr.startsWith("data-sly-test")) {
+              // 기존 data-sly-test 처리: 태그 자체의 조건부 렌더링에 사용됨.
               condition = val;
               if (condition.startsWith("${") && condition.endsWith("}")) {
                 condition = extractDynamicExpression(condition);
@@ -258,7 +275,7 @@ function convertHTLToReact(htlInput) {
         elementJSX = `{(${condition}) && (<>${elementJSX}</>)}`;
       }
       if (repeat) {
-        elementJSX = `{(${repeat.expr}).map((${repeat.identifier}, index) => (<React.Fragment key={index}>${elementJSX}</React.Fragment>))}`;
+        elementJSX = `{(${repeat.expr}).map((${repeat.identifier}, index) => (<Fragment key={index}>${elementJSX}</Fragment>))}`;
       }
       return elementJSX;
     }
@@ -267,11 +284,14 @@ function convertHTLToReact(htlInput) {
 
   const jsxBody = document.children.map((n) => parseNode(n)).join("\n");
   const codeLines = [];
-  codeLines.push(`import React from "react";`);
+  codeLines.push(`import React, { Fragment } from "react";`);
   codeLines.push("");
-  codeLines.push("const t = (str) => str; // i18n dummy function");
+  codeLines.push(
+    "const t = (str: string) => str; // i18n dummy function 사용하지 않으면 지워주세요"
+  );
   codeLines.push("");
-  codeLines.push("export default function Component(props) {");
+  codeLines.push("// 개발자가 직접 타입을 정의해주세요");
+  codeLines.push("export default function Component(props: any) {");
   codeLines.push("  const { /* add your props here */ } = props;");
   codeLines.push("");
   for (const [varName, expr] of Object.entries(vars)) {
