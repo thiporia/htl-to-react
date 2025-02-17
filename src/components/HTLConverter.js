@@ -150,15 +150,6 @@ function convertHTLToReact(htlInput) {
     if (node.type === "tag") {
       const elem = node;
 
-      // <script type="application/ld+json"> 처리: 주석으로 감싸 원본 보존
-      if (
-        elem.name === "script" &&
-        elem.attribs &&
-        elem.attribs.type === "application/ld+json"
-      ) {
-        return `{/*\n${originalNodeString(elem)}\n*/}`;
-      }
-
       // data-sly-call + isEmpty 처리: 주석으로 남기고 설명 추가
       if (
         elem.attribs &&
