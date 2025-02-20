@@ -352,6 +352,17 @@ function convertHTLToReact(htlInput) {
               if (condition.startsWith("${") && condition.endsWith("}")) {
                 condition = extractDynamicExpression(condition);
               }
+            } else if (attr.startsWith("data-sly-repeat")) {
+              const parts = attr.split(".");
+              // 식별자 지정: data-sly-repeat.identifier 형식이면 identifier를, 없으면 기본 "item"
+              const identifier = parts.length > 1 ? parts[1] : "item";
+              let expr = val;
+              if (expr.startsWith("${") && expr.endsWith("}")) {
+                expr = extractDynamicExpression(expr);
+              }
+              // repeat 객체에 isRepeat 플래그를 추가하여 data-sly-repeat임을 명시
+              repeat = { expr, identifier, isRepeat: true };
+              continue;
             } else if (attr.startsWith("data-sly-list")) {
               const parts = attr.split(".");
               const identifier = parts.length > 1 ? parts[1] : "item";
