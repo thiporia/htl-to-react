@@ -353,24 +353,28 @@ function convertHTLToReact(htlInput) {
                 condition = extractDynamicExpression(condition);
               }
             } else if (attr.startsWith("data-sly-repeat")) {
+              // data-sly-repeat: 요소 자체를 반복합니다.
               const parts = attr.split(".");
-              // 식별자 지정: data-sly-repeat.identifier 형식이면 identifier를, 없으면 기본 "item"
               const identifier = parts.length > 1 ? parts[1] : "item";
               let expr = val;
               if (expr.startsWith("${") && expr.endsWith("}")) {
                 expr = extractDynamicExpression(expr);
               }
-              // repeat 객체에 isRepeat 플래그를 추가하여 data-sly-repeat임을 명시
+              // 반복할 전체 엘리먼트를 대상으로, isRepeat 플래그 true 설정
               repeat = { expr, identifier, isRepeat: true };
               continue;
-            } else if (attr.startsWith("data-sly-list")) {
+            }
+            if (attr.startsWith("data-sly-list")) {
+              // data-sly-list: 요소의 자식 콘텐츠만 반복합니다.
               const parts = attr.split(".");
               const identifier = parts.length > 1 ? parts[1] : "item";
               let expr = val;
               if (expr.startsWith("${") && expr.endsWith("}")) {
                 expr = extractDynamicExpression(expr);
               }
-              repeat = { expr, identifier };
+              // 이 경우는 repeat 객체에 isRepeat 플래그 false로 설정하거나 별도 변수로 관리
+              repeat = { expr, identifier, isRepeat: false };
+              continue;
             }
             // data-sly-use, data-sly-include 등은 제외
             continue;
@@ -410,7 +414,26 @@ function convertHTLToReact(htlInput) {
         elementJSX = `{(${condition}) && (<>${elementJSX}</>)}`;
       }
       if (repeat) {
-        elementJSX = `{(${repeat.expr}).map((${repeat.identifier}, index) => (<Fragment key={index}>${elementJSX}</Fragment>))}`;
+        if (repeat.isRepeat) {
+          console.log("repeat", elementJSX);
+          // data-sly-repeat: 요소 자체를 반복
+          // elementJSX = `{(${repeat.expr}).map((${
+          //   repeat.identifier
+          // }, index) => (<React.Fragment key={index}>${
+          //   /* 기존 elementJSX 내부 내용 */ elementJSX
+          // }</React.Fragment>))}`;
+          elementJSX = elementJSX.replace(/^<(\w+)/, "<$1 key={index}");
+          // 2. 반복 처리: map을 사용하여 각 반복마다 elementJSX를 그대로 반환
+          elementJSX = `{(${repeat.expr}).map((${repeat.identifier}, index) => (${elementJSX}))}`;
+        } else {
+          // data-sly-list: 요소의 자식만 반복, 현재 요소는 그대로 유지하고 자식 부분만 반복 처리하도록 구현해야 함.
+          // 예시: elementJSX 내부의 children 부분에 대해 map 처리
+          // (구현 방법은 컴포넌트 구조에 따라 다를 수 있습니다)
+          elementJSX = `<${tagName}${attrString}>${
+            childrenJSX &&
+            `{(${repeat.expr}).map((${repeat.identifier}, index) => (<React.Fragment>${childrenJSX}</React.Fragment>))}`
+          }</${tagName}>`;
+        }
       }
       return elementJSX;
     }
