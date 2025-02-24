@@ -1,10 +1,10 @@
 {
   "files": {
-    "main.js": "/htl-to-react/static/js/main.172d68f2.js",
+    "main.js": "/htl-to-react/static/js/main.165f907f.js",
     "index.html": "/htl-to-react/index.html",
-    "main.172d68f2.js.map": "/htl-to-react/static/js/main.172d68f2.js.map"
+    "main.165f907f.js.map": "/htl-to-react/static/js/main.165f907f.js.map"
   },
   "entrypoints": [
-    "static/js/main.172d68f2.js"
+    "static/js/main.165f907f.js"
   ]
 }
