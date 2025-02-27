@@ -29,6 +29,7 @@
 
 - script 는 주석처리
 - placeholder 조건 설명
+- optional 에 대해서는 /src/utils 를 참고
 
 ## 사용법
 
